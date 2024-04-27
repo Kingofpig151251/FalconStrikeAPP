@@ -8,6 +8,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.os.Handler;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.SurfaceView;
@@ -16,123 +17,94 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.List;
 
-// 定義 GamePanel 類別，繼承自 SurfaceView 類別
 public class GamePanel extends SurfaceView {
 
-    private final Paint mPaint;  // 定義畫筆
-    private final ArrayList<Sprite> mSprites;  // 定義精靈列表
-    private Bitmap mBackgroundBitmap;  // 定義背景圖片
-    private float mDisplayDensity;  // 定義顯示密度
-    private int mState;  // 定義狀態
-    private float mBackgroundY;  // 定義背景圖片的垂直位置
-    private float mBackgroundSpeed;  // 定義背景圖片的滾動速度
+    private final Paint mPaint;
+    private final ArrayList<Sprite> mSprites;
+    private final Sprite mPlayer;
+    private final ArrayList<Sprite> mEnemys;
+    private final ArrayList<Sprite> mBullets;
+    private Bitmap mBackgroundBitmap;
+    private float mDisplayDensity;
+    private int mState;
+    private float mBackgroundY;
+    private float mBackgroundSpeed;
 
-
-    // 定義建構子
-    public GamePanel(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);  // 調用父類的建構子
-        setFocusable(true);  // 設置為可獲取焦點
-
-        mPaint = new Paint();  // 初始化畫筆
-        mSprites = new ArrayList<>();  // 初始化精靈列表
-
-        mState = 0;  //
-
-        mBackgroundY = 0;  // 初始化背景圖片的垂直位置
-        mBackgroundSpeed = 50f * mDisplayDensity;  // 初始化背景圖片的滾動速度
-    }
-
-
-    // 覆寫觸摸事件方法
-    @SuppressLint("ClickableViewAccessibility")
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        for (Sprite sprite : mSprites) {
-            if (!sprite.isDraggable())
-                continue;
-
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    if (sprite.isTouched(event)) {
-                        sprite.setDragging(true);
-                        return true;
-                    }
-                    break;
-                case MotionEvent.ACTION_MOVE:
-                    if (sprite.isDragging())
-                        sprite.setPosition(event.getX(), event.getY());
-                    break;
-                case MotionEvent.ACTION_UP:
-                    if (sprite.isDragging())
-                        sprite.setDragging(false);
-                    break;
+    private Handler mHandler = new Handler();
+    private Runnable mEnemySpawner = new Runnable() {
+        @Override
+        public void run() {
+            if (mEnemys.size() < 10) {
+                spawnEnemy(R.drawable.enemy_red, 150 + (float) (Math.random() * 50));
+                int delay = 2000 + (int) (Math.random() * 2000);  // Generate a random delay between 2000 and 4000 milliseconds
+                mHandler.postDelayed(this, delay);  // Schedule the next spawn with the random delay
             }
         }
+    };
 
-        // 抑制默認行為
-        return true;
+    public GamePanel(Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+        setFocusable(true);
+
+        mPaint = new Paint();
+        mPlayer = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.player), 3, 6);
+        mSprites = new ArrayList<>();
+        mEnemys = new ArrayList<>();
+        mBullets = new ArrayList<>();
+
+        mState = 0;
+        mBackgroundY = 0;
     }
 
-    // 定義開始遊戲的方法
     protected void start() {
         mDisplayDensity = getResources().getDisplayMetrics().density;
+        mBackgroundSpeed = 50f * mDisplayDensity;
 
-        for (int i = 1; i <= 2; i++) {
-            AnimatedSprite playerSprite = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.player), 3, 3);
-            playerSprite.setPosition(100f * i * mDisplayDensity, 100f * i * mDisplayDensity);
-            playerSprite.setScale(mDisplayDensity / 2);
-            mSprites.add(playerSprite);
-        }
-
-        // 速度是基於時間的 (px/s)
-        mSprites.get(0).setDraggable(true);
-        mSprites.get(1).setSpeed(25f * mDisplayDensity, 50f * mDisplayDensity);
-
+        mPlayer.setPosition(100f * mDisplayDensity, 100f * mDisplayDensity);
+        mPlayer.setScale(mDisplayDensity / 2);
+        mPlayer.setDraggable(true);
+        mSprites.add(mPlayer);
+        mHandler.post(mEnemySpawner);  // Start spawning enemies
     }
 
-    // 定義更新遊戲的方法
     protected void update(float deltaTime) {
-        mBackgroundY += mBackgroundSpeed * deltaTime;
-        if (mBackgroundY > getHeight()) {
-            mBackgroundY -= mBackgroundBitmap.getHeight();
+        if (mBackgroundBitmap != null) {
+            mBackgroundY += mBackgroundSpeed * deltaTime;
+            if (mBackgroundY > mBackgroundBitmap.getHeight()) {
+                mBackgroundY -= mBackgroundBitmap.getHeight();
+            }
         }
-        mSprites.get(1).move(deltaTime);
-        mSprites.get(1).handleBounce(0, 0, getWidth(), getHeight());
+        // 更新所有敵人的位置
+        for (Sprite enemy : mEnemys) {
+            enemy.move(deltaTime);
+
+            // 如果敵人的位置超出了畫面的底部，將其位置重置到畫面的頂部
+            if (enemy.getBounds().top > getHeight()) {
+                float x = (float) Math.random() * (getWidth() - enemy.getBounds().width());
+                float y = -enemy.getBounds().height();
+                enemy.setPosition(x, y);
+            }
+        }
     }
 
-    // 定義渲染遊戲的方法
-    protected void render(@NonNull Canvas canvas) {
-        // 背景
-        drawBackgroundBitmap(mState, canvas);
 
-        // 文本
+    protected void render(@NonNull Canvas canvas) {
+        drawBackgroundBitmap(mState, canvas);
         mPaint.setColor(Color.RED);
         mPaint.setTextSize(16f * mDisplayDensity);
         drawMultilineText(canvas, "Animated Sprite Sample", 16f * mDisplayDensity, 16f * mDisplayDensity, mPaint);
 
-        // 精靈
         for (Sprite sprite : mSprites) {
             if (sprite instanceof AnimatedSprite) {
                 ((AnimatedSprite) sprite).handleAnimation();
             }
             sprite.render(canvas);
         }
+
     }
 
-    // 定義繪製多行文本的方法
-    protected void drawMultilineText(Canvas canvas, String text, float x, float y, Paint paint) {
-        Rect textBounds = new Rect();
-        float yOffset = 0f;
-
-        for (String line : text.split("\n")) {
-            paint.getTextBounds(line, 0, line.length(), textBounds);
-            yOffset += textBounds.height();
-            canvas.drawText(line, x, y + yOffset, mPaint);
-        }
-    }
-
-    // 定義設置背景圖片的方法
     protected void drawBackgroundBitmap(int mState, Canvas canvas) {
         switch (mState) {
             case 0:
@@ -149,11 +121,85 @@ public class GamePanel extends SurfaceView {
         if (mBackgroundBitmap != null) {
             int width = getWidth();
             int height = getHeight();
-            for (int y = (int) mBackgroundY; y < height; y += mBackgroundBitmap.getHeight()) {
+            for (int y = (int) mBackgroundY - mBackgroundBitmap.getHeight(); y < height; y += mBackgroundBitmap.getHeight()) {
                 for (int x = 0; x < width; x += mBackgroundBitmap.getWidth()) {
                     canvas.drawBitmap(mBackgroundBitmap, x, y, null);
                 }
             }
         }
+    }
+
+    protected void drawMultilineText(Canvas canvas, String text, float x, float y, Paint paint) {
+        Rect textBounds = new Rect();
+        float yOffset = 0f;
+
+        for (String line : text.split("\n")) {
+            paint.getTextBounds(line, 0, line.length(), textBounds);
+            yOffset += textBounds.height();
+            canvas.drawText(line, x, y + yOffset, mPaint);
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        for (Sprite sprite : mSprites) {
+            if (!sprite.isDraggable())
+                continue;
+
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    if (sprite.isTouched(event)) {
+                        sprite.setDragging(true);
+                        return true;
+                    }
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (sprite.isDragging()) {
+                        sprite.setPosition(event.getX(), event.getY());
+                    }
+                    spawnBullet();
+                    break;
+                case MotionEvent.ACTION_UP:
+                    if (sprite.isDragging())
+                        sprite.setDragging(false);
+                    break;
+            }
+        }
+        return true;
+    }
+
+    public void spawnEnemy(int enemyDrawableId, float ySpeed) {
+        // 創建敵人精靈
+        AnimatedSprite enemySprite = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), enemyDrawableId), 3, 6);
+
+        // 計算敵人的初始位置
+        float x = (float) Math.random() * (getWidth() - enemySprite.getBounds().width());
+        float y = -enemySprite.getBounds().height();
+
+        // 設置敵人的位置和速度
+        enemySprite.setPosition(x, y);
+        enemySprite.setSpeed(0, ySpeed * mDisplayDensity);
+
+        // 將敵人添加到列表中
+        mEnemys.add(enemySprite);
+        mSprites.add(enemySprite);
+    }
+
+    public void spawnBullet() {
+        // 創建子彈精靈
+        AnimatedSprite bulletSprite = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.bullet), 3, 6);
+
+        // 計算子彈的初始位置
+        float x = mPlayer.getBounds().centerX();
+        float y = mPlayer.getBounds().top;
+
+        // 設置子彈的位置和速度
+        bulletSprite.setPosition(x, y);
+        bulletSprite.setSpeed(0, -50f * mDisplayDensity);  // 假設子彈的速度為50dp/s
+
+        // 將子彈添加到列表中
+        mBullets.add(bulletSprite);
+        mSprites.add(bulletSprite);
     }
 }
