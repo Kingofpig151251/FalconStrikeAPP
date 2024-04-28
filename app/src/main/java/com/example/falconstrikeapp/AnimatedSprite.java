@@ -18,12 +18,14 @@ public class AnimatedSprite extends Sprite {
     protected int mCurFrame;  // 當前的幀
     protected long mNextFrameTime;  // 下一幀的時間
 
-    public AnimatedSprite(Bitmap bitmap, int numFrames, int framesPerSecond) {
+    protected SpriteType mType;
+
+    public AnimatedSprite(Bitmap bitmap, int numFrames, int framesPerSecond, SpriteType type) {
         super(bitmap);
         mNumFrames = numFrames;
-        mFPS = (long)(1 / (double)framesPerSecond * 1000);
+        mFPS = (long) (1 / (double) framesPerSecond * 1000);
         mFrames = new ArrayList<>();
-
+        mType = type;
         int bitmapWidth = mBitmap.getWidth() / mNumFrames;
         int bitmapHeight = mBitmap.getHeight();
 
@@ -35,6 +37,11 @@ public class AnimatedSprite extends Sprite {
                     bitmapHeight
             ));
         }
+    }
+
+
+    public SpriteType getType() {
+        return mType;
     }
 
     public void handleAnimation() {
