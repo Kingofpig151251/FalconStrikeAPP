@@ -6,6 +6,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +19,10 @@ public class AnimatedSprite extends Sprite {
     protected final List<Rect> mFrames;  // 儲存動畫幀的邊界
     protected int mCurFrame;  // 當前的幀
     protected long mNextFrameTime;  // 下一幀的時間
+
+    private boolean isVisible = true;
+    private Handler mHandler = new Handler(Looper.getMainLooper());
+
 
     protected SpriteType mType;
 
@@ -39,7 +45,6 @@ public class AnimatedSprite extends Sprite {
         }
     }
 
-
     public SpriteType getType() {
         return mType;
     }
@@ -54,15 +59,12 @@ public class AnimatedSprite extends Sprite {
 
     @Override
     public void render(Canvas canvas) {
+        if (!isVisible) {
+            return;
+        }
         Rect frame = mFrames.get(mCurFrame);
         canvas.drawBitmap(mBitmap, frame, getBounds(), mPaint);
 
-        // 繪製碰撞體積的邊界
-        Paint boundsPaint = new Paint();
-        boundsPaint.setColor(Color.RED);
-        boundsPaint.setStyle(Paint.Style.STROKE);
-        boundsPaint.setStrokeWidth(2);
-        canvas.drawRect(getBounds(), boundsPaint);
     }
 
     @Override
@@ -87,5 +89,21 @@ public class AnimatedSprite extends Sprite {
         }
 
         return bounds;
+    }
+
+    public void startBlinking(long blinkDuration, long blinkInterval) {
+        mHandler.postDelayed(new Runnable() {
+            long endTime = System.currentTimeMillis() + blinkDuration;
+
+            @Override
+            public void run() {
+                isVisible = !isVisible;
+                if (System.currentTimeMillis() < endTime) {
+                    mHandler.postDelayed(this, blinkInterval);
+                } else {
+                    isVisible = true;
+                }
+            }
+        }, blinkInterval);
     }
 }

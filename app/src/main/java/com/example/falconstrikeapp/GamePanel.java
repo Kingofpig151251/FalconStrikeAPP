@@ -61,7 +61,8 @@ public class GamePanel extends SurfaceView implements CollisionListener {
         public void run() {
             if (mIsGameOver || mIsGameWin) return;
             if (mEnemy.size() < MAX_ENEMIES) {
-                spawnEnemy();
+                if (mIsGameStart)
+                    spawnEnemy();
             }
             mHandler.postDelayed(this, 2000);
         }
@@ -97,38 +98,6 @@ public class GamePanel extends SurfaceView implements CollisionListener {
         mPlayer.setScale(mDisplayDensity / 2);
         mPlayer.setDraggable(true);
         mSprites.add(mPlayer);
-      /*  for (int i = 0; i < 3; i++) {
-            AnimatedSprite enemy_red = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6);
-            enemy_red.setSpeed(0, 0);
-            enemy_red.setPosition(-100f, -100f);
-            enemy_red.setActivate(false);
-            mEnemy.add(enemy_red);
-            mSprites.add(enemy_red);
-        }
-        for (int i = 0; i < 3; i++) {
-            AnimatedSprite enemy_blue = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_blue), 3, 6);
-            enemy_blue.setSpeed(0, 0);
-            enemy_blue.setPosition(-100f, -100f);
-            enemy_blue.setActivate(false);
-            mEnemy.add(enemy_blue);
-            mSprites.add(enemy_blue);
-        }
-        for (int i = 0; i < 3; i++) {
-            AnimatedSprite enemy_green = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_green), 3, 6);
-            enemy_green.setSpeed(0, 0);
-            enemy_green.setPosition(-100f, -100f);
-            enemy_green.setActivate(false);
-            mEnemy.add(enemy_green);
-            mSprites.add(enemy_green);
-        }
-        for (int i = 0; i < 5; i++) {
-            AnimatedSprite bullet = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.bullet), 3, 6);
-            bullet.setSpeed(0, 0);
-            bullet.setPosition(-200f, -200f);
-            bullet.setActivate(false);
-            mBullets.add(bullet);
-            mSprites.add(bullet);
-        }*/
         mHandler.postDelayed(mActivateEnemyTask, 0);
         collisionThread = new CollisionThread(mSprites, 100, getWidth(), getHeight(), this);
         collisionThread.start();
@@ -202,24 +171,26 @@ public class GamePanel extends SurfaceView implements CollisionListener {
         mPaint.setColor(Color.RED);
         mPaint.setTextSize(24f * mDisplayDensity);
 
-        drawMultilineText(canvas, "Score :" + mScore, 128f, 48f, mPaint);
-        drawMultilineText(canvas, "HP :" + mPlayerHP, 100f, 48f * mDisplayDensity, mPaint);
+        drawMultilineText(canvas, "Score :" + mScore, 16f, 48f, mPaint, false);
+        drawMultilineText(canvas, "HP :" + mPlayerHP, 16f, 48f * mDisplayDensity, mPaint, false);
 
         if (mIsGameOver) {
             mPaint.setColor(Color.RED);
             mPaint.setTextSize(32f * mDisplayDensity);
-            drawMultilineText(canvas, "Game Over", centerX, centerY, mPaint);
+            drawMultilineText(canvas, "Game Over", centerX, centerY, mPaint, true);
         }
         if (mIsGameWin) {
             mPaint.setColor(Color.RED);
             mPaint.setTextSize(32f * mDisplayDensity);
-            drawMultilineText(canvas, "You Win", centerX, centerY, mPaint);
+            drawMultilineText(canvas, "You Win", centerX, centerY * 2f, mPaint, true);
         }
 
         if (!mIsGameStart) {
             mPaint.setColor(Color.RED);
+            mPaint.setTextSize(48f * mDisplayDensity);
+            drawMultilineText(canvas, "Falcon Strike", centerX, centerY / 2, mPaint, true);
             mPaint.setTextSize(32f * mDisplayDensity);
-            drawMultilineText(canvas, "Touch and drag the\nplayer to start", centerX, centerY, mPaint);
+            drawMultilineText(canvas, "Touch and drag the\nplayer to start", centerX, centerY, mPaint, true);
         }
 
         for (Sprite sprite : mSprites) {
@@ -255,14 +226,14 @@ public class GamePanel extends SurfaceView implements CollisionListener {
         }
     }
 
-    protected void drawMultilineText(Canvas canvas, String text, float x, float y, Paint paint) {
+    protected void drawMultilineText(Canvas canvas, String text, float x, float y, Paint paint, boolean centerText) {
         Rect textBounds = new Rect();
         float yOffset = 0f;
 
         for (String line : text.split("\n")) {
             paint.getTextBounds(line, 0, line.length(), textBounds);
             yOffset += textBounds.height();
-            float adjustedX = x - textBounds.width() / 2;  // Adjust the x position based on the text width
+            float adjustedX = centerText ? x - textBounds.width() / 2 : x;  // 根據是否需要置中來調整 x 的位置
             canvas.drawText(line, adjustedX, y + yOffset, mPaint);
         }
     }
@@ -296,38 +267,40 @@ public class GamePanel extends SurfaceView implements CollisionListener {
         return true;
     }
 
-public void spawnEnemy() {
-    AnimatedSprite enemy;
-    float speed;
-    int enemyType = (int) (Math.random() * mLevel) + 1;
-    switch (enemyType) {
-        case 1:
-            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6, SpriteType.ENEMY);
-            speed = 100 * mDisplayDensity * mLevel;
-            break;
-        case 2:
-            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_blue), 3, 6, SpriteType.ENEMY);
-            speed = 150 * mDisplayDensity * mLevel;
-            break;
-        case 3:
-            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_green), 3, 6, SpriteType.ENEMY);
-            speed = 200 * mDisplayDensity * mLevel;
-            break;
-        default:
-            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6, SpriteType.ENEMY);
-            speed = 100 * mDisplayDensity * mLevel;
-            break;
+    public void spawnEnemy() {
+        AnimatedSprite enemy;
+        float speed;
+        int enemyType = (int) (Math.random() * mLevel) + 1;
+        switch (enemyType) {
+            case 1:
+                enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6, SpriteType.ENEMY);
+                speed = 100 * mDisplayDensity * mLevel;
+                break;
+            case 2:
+                enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_blue), 3, 6, SpriteType.ENEMY);
+                speed = 150 * mDisplayDensity * mLevel;
+                break;
+            case 3:
+                enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_green), 3, 6, SpriteType.ENEMY);
+                speed = 200 * mDisplayDensity * mLevel;
+                break;
+            default:
+                enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6, SpriteType.ENEMY);
+                speed = 100 * mDisplayDensity * mLevel;
+                break;
+        }
+        enemy.setSpeed(0, speed);
+        enemy.setPosition((float) Math.random() * (getWidth() - enemy.getBounds().width()), -enemy.getBounds().height());
+        mEnemy.add(enemy);
+        mSprites.add(enemy);
     }
-    enemy.setSpeed(0, speed);
-    enemy.setPosition((float) Math.random() * (getWidth() - enemy.getBounds().width()), -enemy.getBounds().height());
-    mEnemy.add(enemy);
-    mSprites.add(enemy);
-}
+
     @Override
     public void onPlayerEnemyCollision(AnimatedSprite player, AnimatedSprite enemy) {
         // 在這裡處理玩家與敵人的碰撞
         // 檢查玩家是否在無敵時間內
         if (System.currentTimeMillis() - mLastHitTime > PLAYER_INVINCIBLE_TIME) {
+            player.startBlinking(PLAYER_INVINCIBLE_TIME, 200);  // 閃爍時間為無敵時間，閃爍間隔為200毫秒
             spawnExplosion(player);
             mPlayerHP--;
             mLastHitTime = System.currentTimeMillis();  // 更新最後被撞的時間

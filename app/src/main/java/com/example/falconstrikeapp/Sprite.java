@@ -1,5 +1,6 @@
 package com.example.falconstrikeapp;
 
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -106,6 +107,28 @@ public class Sprite {
 
     // 定義設置位置的方法
     public void setPosition(float x, float y) {
+        // 獲取畫面的寬度和高度
+        int screenWidth = Resources.getSystem().getDisplayMetrics().widthPixels;
+        int screenHeight = Resources.getSystem().getDisplayMetrics().heightPixels;
+
+        // 獲取精靈的寬度和高度
+        float spriteWidth = getBounds().width();
+        float spriteHeight = getBounds().height();
+
+        // 檢查並調整 x 和 y 的值，以確保精靈不會超出畫面邊界
+        if (x - spriteWidth / 2 < 0) {
+            x = spriteWidth / 2;
+        } else if (x + spriteWidth / 2 > screenWidth) {
+            x = screenWidth - spriteWidth / 2;
+        }
+
+        if (y - spriteHeight / 2 < 0) {
+            y = spriteHeight / 2;
+        } else if (y + spriteHeight / 2 > screenHeight) {
+            y = screenHeight - spriteHeight / 2;
+        }
+
+        // 更新精靈的位置
         mX = x;
         mY = y;
     }
