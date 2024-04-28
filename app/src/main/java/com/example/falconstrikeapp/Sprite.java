@@ -18,6 +18,7 @@ public class Sprite {
     protected float mScale;  // 精靈的縮放比例
     protected boolean mDraggable, mDragging;  // 精靈是否可以拖動，以及是否正在被拖動
 
+
     // 定義建構子
     public Sprite(Bitmap bitmap) {
         mBitmap = bitmap;  // 初始化圖像
@@ -118,5 +119,13 @@ public class Sprite {
     public void setSpeed(float xSpeed, float ySpeed) {
         mXSpeed = xSpeed;
         mYSpeed = ySpeed;
+    }
+
+    public float getX() {
+        return mX;
+    }
+
+    public float getY() {
+        return mY;
     }
 }

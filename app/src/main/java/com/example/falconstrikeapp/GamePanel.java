@@ -1,6 +1,7 @@
 package com.example.falconstrikeapp;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -8,6 +9,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.media.AudioAttributes;
+import android.media.SoundPool;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -16,85 +19,208 @@ import android.view.SurfaceView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
-public class GamePanel extends SurfaceView {
+public class GamePanel extends SurfaceView implements CollisionListener {
+    private static final int MAX_ENEMIES = 10;
+    private static final float BULLET_SPEED = -300f;
+    private static final long BULLET_INTERVAL = 1000;
+    private static final long PLAYER_INVINCIBLE_TIME = 3000;  // 玩家的無敵時間（毫秒）
 
+    private long mLastHitTime;  // 玩家上次被撞的時間
     private final Paint mPaint;
-    private final ArrayList<Sprite> mSprites;
-    private final Sprite mPlayer;
-    private final ArrayList<Sprite> mEnemys;
-    private final ArrayList<Sprite> mBullets;
+    private final CopyOnWriteArrayList<AnimatedSprite> mSprites;
+    private final AnimatedSprite mPlayer;
+    private final CopyOnWriteArrayList<AnimatedSprite> mEnemy;
+    private final CopyOnWriteArrayList<AnimatedSprite> mBullets;
+
+    private CollisionThread collisionThread;
+
     private Bitmap mBackgroundBitmap;
     private float mDisplayDensity;
-    private int mState;
+    private int mLevel;
     private float mBackgroundY;
     private float mBackgroundSpeed;
+    private long mLastBulletTime;
 
-    private Handler mHandler = new Handler();
-    private Runnable mEnemySpawner = new Runnable() {
+    private int mPlayerHP = 3;
+
+    private int mScore = 0;
+    private float centerX, centerY;
+    private boolean mIsGameOver = false;
+    private boolean mIsGameWin = false;
+    private boolean mIsGameStart = false;
+
+    private final SoundPool mSoundPool;
+    private final int mExplosionSoundId;
+
+    private final Handler mHandler = new Handler();
+    //每1秒激活一个敌人
+    private final Runnable mActivateEnemyTask = new Runnable() {
         @Override
         public void run() {
-            if (mEnemys.size() < 10) {
-                spawnEnemy(R.drawable.enemy_red, 150 + (float) (Math.random() * 50));
-                int delay = 2000 + (int) (Math.random() * 2000);  // Generate a random delay between 2000 and 4000 milliseconds
-                mHandler.postDelayed(this, delay);  // Schedule the next spawn with the random delay
+            if (mIsGameOver || mIsGameWin) return;
+            if (mEnemy.size() < MAX_ENEMIES) {
+                spawnEnemy();
             }
+            mHandler.postDelayed(this, 2000);
         }
     };
 
     public GamePanel(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         setFocusable(true);
-
         mPaint = new Paint();
-        mPlayer = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.player), 3, 6);
-        mSprites = new ArrayList<>();
-        mEnemys = new ArrayList<>();
-        mBullets = new ArrayList<>();
+        mPlayer = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.player), 3, 6, SpriteType.PLAYER);
+        mSprites = new CopyOnWriteArrayList<>();
+        mEnemy = new CopyOnWriteArrayList<>();
+        mBullets = new CopyOnWriteArrayList<>();
 
-        mState = 0;
+        mLevel = 1;
         mBackgroundY = 0;
+
+        // 創建 SoundPool
+        AudioAttributes audioAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+        mSoundPool = new SoundPool.Builder().setAudioAttributes(audioAttributes).setMaxStreams(2).build();
+
+        // 加載音效
+        mExplosionSoundId = mSoundPool.load(context, R.raw.explosion, 1);
+
     }
 
     protected void start() {
         mDisplayDensity = getResources().getDisplayMetrics().density;
         mBackgroundSpeed = 50f * mDisplayDensity;
-
-        mPlayer.setPosition(100f * mDisplayDensity, 100f * mDisplayDensity);
+        centerX = (getWidth() - mPlayer.getBounds().width() * mDisplayDensity);
+        centerY = (getHeight() - mPlayer.getBounds().height() * mDisplayDensity);
+        mPlayer.setPosition(centerX, centerY);
         mPlayer.setScale(mDisplayDensity / 2);
         mPlayer.setDraggable(true);
         mSprites.add(mPlayer);
-        mHandler.post(mEnemySpawner);  // Start spawning enemies
+      /*  for (int i = 0; i < 3; i++) {
+            AnimatedSprite enemy_red = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6);
+            enemy_red.setSpeed(0, 0);
+            enemy_red.setPosition(-100f, -100f);
+            enemy_red.setActivate(false);
+            mEnemy.add(enemy_red);
+            mSprites.add(enemy_red);
+        }
+        for (int i = 0; i < 3; i++) {
+            AnimatedSprite enemy_blue = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_blue), 3, 6);
+            enemy_blue.setSpeed(0, 0);
+            enemy_blue.setPosition(-100f, -100f);
+            enemy_blue.setActivate(false);
+            mEnemy.add(enemy_blue);
+            mSprites.add(enemy_blue);
+        }
+        for (int i = 0; i < 3; i++) {
+            AnimatedSprite enemy_green = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_green), 3, 6);
+            enemy_green.setSpeed(0, 0);
+            enemy_green.setPosition(-100f, -100f);
+            enemy_green.setActivate(false);
+            mEnemy.add(enemy_green);
+            mSprites.add(enemy_green);
+        }
+        for (int i = 0; i < 5; i++) {
+            AnimatedSprite bullet = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.bullet), 3, 6);
+            bullet.setSpeed(0, 0);
+            bullet.setPosition(-200f, -200f);
+            bullet.setActivate(false);
+            mBullets.add(bullet);
+            mSprites.add(bullet);
+        }*/
+        mHandler.postDelayed(mActivateEnemyTask, 0);
+        collisionThread = new CollisionThread(mSprites, 100, getWidth(), getHeight(), this);
+        collisionThread.start();
     }
 
     protected void update(float deltaTime) {
+        if (mIsGameOver || mIsGameWin) {
+            mHandler.postDelayed(() -> ((Activity) getContext()).finish(), 5000);
+            return;
+        }
+        switch (mScore) {
+            case 100:
+                mLevel = 2;
+                break;
+            case 200:
+                mLevel = 3;
+                break;
+            case 300:
+                mIsGameWin = true;
+        }
+        updateBackground(deltaTime);
+        fireBullets();
+        updateEnemies(deltaTime);
+        updateBullets(deltaTime);
+    }
+
+    private void updateBackground(float deltaTime) {
         if (mBackgroundBitmap != null) {
             mBackgroundY += mBackgroundSpeed * deltaTime;
             if (mBackgroundY > mBackgroundBitmap.getHeight()) {
                 mBackgroundY -= mBackgroundBitmap.getHeight();
             }
         }
-        // 更新所有敵人的位置
-        for (Sprite enemy : mEnemys) {
-            enemy.move(deltaTime);
+    }
 
-            // 如果敵人的位置超出了畫面的底部，將其位置重置到畫面的頂部
-            if (enemy.getBounds().top > getHeight()) {
-                float x = (float) Math.random() * (getWidth() - enemy.getBounds().width());
-                float y = -enemy.getBounds().height();
-                enemy.setPosition(x, y);
+    private void fireBullets() {
+        if (System.currentTimeMillis() - mLastBulletTime > BULLET_INTERVAL && mPlayer.isDragging()) {
+            mLastBulletTime = System.currentTimeMillis();
+            AnimatedSprite bullet = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.bullet), 3, 6, SpriteType.BULLET);
+            bullet.setPosition(mPlayer.getX(), mPlayer.getY() - mPlayer.getBounds().height());
+            bullet.setSpeed(0, BULLET_SPEED * mDisplayDensity);
+            mBullets.add(bullet);
+            mSprites.add(bullet);
+        }
+    }
+
+    private void updateEnemies(float deltaTime) {
+        for (Sprite enemy : mEnemy) {
+            enemy.move(deltaTime);
+            if (enemy.getY() > getHeight()) {
+                enemy.setPosition((float) Math.random() * (getWidth() - enemy.getBounds().width()), -enemy.getBounds().height());
+            }
+        }
+    }
+
+    private void updateBullets(float deltaTime) {
+        //更新子彈位置
+        for (Sprite bullet : mBullets) {
+            bullet.move(deltaTime);
+            //子彈超出螢幕
+            if (bullet.getY() < 0) {
+                mBullets.remove(bullet);
+                mSprites.remove(bullet);
             }
         }
     }
 
 
     protected void render(@NonNull Canvas canvas) {
-        drawBackgroundBitmap(mState, canvas);
+        drawBackgroundBitmap(mLevel, canvas);
         mPaint.setColor(Color.RED);
-        mPaint.setTextSize(16f * mDisplayDensity);
-        drawMultilineText(canvas, "Animated Sprite Sample", 16f * mDisplayDensity, 16f * mDisplayDensity, mPaint);
+        mPaint.setTextSize(24f * mDisplayDensity);
+
+        drawMultilineText(canvas, "Score :" + mScore, 128f, 48f, mPaint);
+        drawMultilineText(canvas, "HP :" + mPlayerHP, 100f, 48f * mDisplayDensity, mPaint);
+
+        if (mIsGameOver) {
+            mPaint.setColor(Color.RED);
+            mPaint.setTextSize(32f * mDisplayDensity);
+            drawMultilineText(canvas, "Game Over", centerX, centerY, mPaint);
+        }
+        if (mIsGameWin) {
+            mPaint.setColor(Color.RED);
+            mPaint.setTextSize(32f * mDisplayDensity);
+            drawMultilineText(canvas, "You Win", centerX, centerY, mPaint);
+        }
+
+        if (!mIsGameStart) {
+            mPaint.setColor(Color.RED);
+            mPaint.setTextSize(32f * mDisplayDensity);
+            drawMultilineText(canvas, "Touch and drag the\nplayer to start", centerX, centerY, mPaint);
+        }
 
         for (Sprite sprite : mSprites) {
             if (sprite instanceof AnimatedSprite) {
@@ -102,18 +228,18 @@ public class GamePanel extends SurfaceView {
             }
             sprite.render(canvas);
         }
-
     }
+
 
     protected void drawBackgroundBitmap(int mState, Canvas canvas) {
         switch (mState) {
-            case 0:
+            case 1:
                 mBackgroundBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.water);
                 break;
-            case 1:
+            case 2:
                 mBackgroundBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.desert);
                 break;
-            case 2:
+            case 3:
                 mBackgroundBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.base);
                 break;
         }
@@ -136,7 +262,8 @@ public class GamePanel extends SurfaceView {
         for (String line : text.split("\n")) {
             paint.getTextBounds(line, 0, line.length(), textBounds);
             yOffset += textBounds.height();
-            canvas.drawText(line, x, y + yOffset, mPaint);
+            float adjustedX = x - textBounds.width() / 2;  // Adjust the x position based on the text width
+            canvas.drawText(line, adjustedX, y + yOffset, mPaint);
         }
     }
 
@@ -144,8 +271,7 @@ public class GamePanel extends SurfaceView {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         for (Sprite sprite : mSprites) {
-            if (!sprite.isDraggable())
-                continue;
+            if (!sprite.isDraggable()) continue;
 
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -156,50 +282,86 @@ public class GamePanel extends SurfaceView {
                     break;
                 case MotionEvent.ACTION_MOVE:
                     if (sprite.isDragging()) {
+                        if (!mIsGameStart) {
+                            mIsGameStart = true;
+                        }
                         sprite.setPosition(event.getX(), event.getY());
                     }
-                    spawnBullet();
                     break;
                 case MotionEvent.ACTION_UP:
-                    if (sprite.isDragging())
-                        sprite.setDragging(false);
+                    if (sprite.isDragging()) sprite.setDragging(false);
                     break;
             }
         }
         return true;
     }
 
-    public void spawnEnemy(int enemyDrawableId, float ySpeed) {
-        // 創建敵人精靈
-        AnimatedSprite enemySprite = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), enemyDrawableId), 3, 6);
-
-        // 計算敵人的初始位置
-        float x = (float) Math.random() * (getWidth() - enemySprite.getBounds().width());
-        float y = -enemySprite.getBounds().height();
-
-        // 設置敵人的位置和速度
-        enemySprite.setPosition(x, y);
-        enemySprite.setSpeed(0, ySpeed * mDisplayDensity);
-
-        // 將敵人添加到列表中
-        mEnemys.add(enemySprite);
-        mSprites.add(enemySprite);
+public void spawnEnemy() {
+    AnimatedSprite enemy;
+    float speed;
+    int enemyType = (int) (Math.random() * mLevel) + 1;
+    switch (enemyType) {
+        case 1:
+            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6, SpriteType.ENEMY);
+            speed = 100 * mDisplayDensity * mLevel;
+            break;
+        case 2:
+            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_blue), 3, 6, SpriteType.ENEMY);
+            speed = 150 * mDisplayDensity * mLevel;
+            break;
+        case 3:
+            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_green), 3, 6, SpriteType.ENEMY);
+            speed = 200 * mDisplayDensity * mLevel;
+            break;
+        default:
+            enemy = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.enemy_red), 3, 6, SpriteType.ENEMY);
+            speed = 100 * mDisplayDensity * mLevel;
+            break;
+    }
+    enemy.setSpeed(0, speed);
+    enemy.setPosition((float) Math.random() * (getWidth() - enemy.getBounds().width()), -enemy.getBounds().height());
+    mEnemy.add(enemy);
+    mSprites.add(enemy);
+}
+    @Override
+    public void onPlayerEnemyCollision(AnimatedSprite player, AnimatedSprite enemy) {
+        // 在這裡處理玩家與敵人的碰撞
+        // 檢查玩家是否在無敵時間內
+        if (System.currentTimeMillis() - mLastHitTime > PLAYER_INVINCIBLE_TIME) {
+            spawnExplosion(player);
+            mPlayerHP--;
+            mLastHitTime = System.currentTimeMillis();  // 更新最後被撞的時間
+            if (mPlayerHP <= 0) {
+                mIsGameOver = true;
+            }
+            mEnemy.remove(enemy);
+            mSprites.remove(enemy);
+        }
     }
 
-    public void spawnBullet() {
-        // 創建子彈精靈
-        AnimatedSprite bulletSprite = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.bullet), 3, 6);
+    @Override
+    public void onBulletEnemyCollision(AnimatedSprite bullet, AnimatedSprite enemy) {
+        // 在這裡處理子彈與敵人的碰撞
+        spawnExplosion(enemy);
+        mScore += 10;
+        mBullets.remove(bullet);
+        mSprites.remove(bullet);
+        mEnemy.remove(enemy);
+        mSprites.remove(enemy);
+    }
 
-        // 計算子彈的初始位置
-        float x = mPlayer.getBounds().centerX();
-        float y = mPlayer.getBounds().top;
 
-        // 設置子彈的位置和速度
-        bulletSprite.setPosition(x, y);
-        bulletSprite.setSpeed(0, -50f * mDisplayDensity);  // 假設子彈的速度為50dp/s
-
-        // 將子彈添加到列表中
-        mBullets.add(bulletSprite);
-        mSprites.add(bulletSprite);
+    private void spawnExplosion(AnimatedSprite sprite) {
+        AnimatedSprite explosion = new AnimatedSprite(BitmapFactory.decodeResource(getResources(), R.drawable.explosion), 3, 6, SpriteType.EXPLOSION);
+        explosion.setPosition(sprite.getX(), sprite.getY());
+        explosion.setSpeed(0, 0);
+        mSprites.add(explosion);
+        mSoundPool.play(mExplosionSoundId, 1, 1, 1, 0, 1);
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                mSprites.remove(explosion);
+            }
+        }, 3000);
     }
 }

@@ -1,6 +1,7 @@
 package com.example.falconstrikeapp;
 
 import android.content.Intent;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.Choreographer;
 import android.view.SurfaceHolder;
@@ -9,14 +10,15 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-// 定義 MainActivity 類別，繼承自 AppCompatActivity 類別，並實現 SurfaceHolder.Callback 和 Choreographer.FrameCallback 接口
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback,
         Choreographer.FrameCallback {
 
     private GamePanel mGamePanel;  // 定義遊戲面板
     private GameThread mGameThread;  // 定義遊戲線程
 
-    // 覆寫 onCreate 方法
+    private MediaPlayer mMediaPlayer;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -24,12 +26,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         mGamePanel = findViewById(R.id.gamePanel);  // 初始化遊戲面板
         mGamePanel.getHolder().addCallback(this);  // 為遊戲面板的 Holder 添加回調
+
+        // 創建 MediaPlayer 並開始播放音樂
+        mMediaPlayer = MediaPlayer.create(this, R.raw.bgm);
+        mMediaPlayer.setLooping(true);  // 設置音樂為循環播放
+        mMediaPlayer.start();
     }
 
     // 覆寫 onResume 方法
     @Override
     protected void onResume() {
         super.onResume();
+        if (mMediaPlayer != null) {
+            mMediaPlayer.start();  // 繼續播放音樂
+        }
         if (mGameThread != null) {
             Choreographer.getInstance().postFrameCallback(this);  // 為 Choreographer 添加幀回調
         }
@@ -39,7 +49,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     @Override
     protected void onPause() {
         super.onPause();
+        if (mMediaPlayer != null) {
+            mMediaPlayer.pause();  // 暫停音樂
+        }
         Choreographer.getInstance().removeFrameCallback(this);  // 為 Choreographer 移除幀回調
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mMediaPlayer != null) {
+            mMediaPlayer.release();  // 釋放 MediaPlayer
+            mMediaPlayer = null;
+        }
     }
 
     // 實現 SurfaceHolder.Callback 接口的 surfaceCreated 方法
