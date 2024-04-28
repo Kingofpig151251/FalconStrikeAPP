@@ -1,4 +1,4 @@
-package com.example.falconstrikeapp;
+package com.example.falcon_strike_app;
 
 public interface CollisionListener {
     void onPlayerEnemyCollision(AnimatedSprite player, AnimatedSprite enemy);

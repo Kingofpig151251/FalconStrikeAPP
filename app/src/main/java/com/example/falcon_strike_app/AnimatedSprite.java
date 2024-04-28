@@ -1,9 +1,7 @@
-package com.example.falconstrikeapp;
+package com.example.falcon_strike_app;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Handler;
@@ -14,15 +12,14 @@ import java.util.List;
 
 public class AnimatedSprite extends Sprite {
 
-    protected final int mNumFrames;  // 動畫的幀數
-    protected final long mFPS;  // 動畫的幀率
-    protected final List<Rect> mFrames;  // 儲存動畫幀的邊界
-    protected int mCurFrame;  // 當前的幀
-    protected long mNextFrameTime;  // 下一幀的時間
+    protected final int mNumFrames;  // Number of frames in the animation
+    protected final long mFPS;  // Frame rate of the animation
+    protected final List<Rect> mFrames;  // Stores the boundaries of the animation frames
+    protected int mCurFrame;  // Current frame
+    protected long mNextFrameTime;  // Time of the next frame
 
     private boolean isVisible = true;
     private Handler mHandler = new Handler(Looper.getMainLooper());
-
 
     protected SpriteType mType;
 
@@ -64,7 +61,6 @@ public class AnimatedSprite extends Sprite {
         }
         Rect frame = mFrames.get(mCurFrame);
         canvas.drawBitmap(mBitmap, frame, getBounds(), mPaint);
-
     }
 
     @Override

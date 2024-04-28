@@ -1,9 +1,8 @@
-package com.example.falconstrikeapp;
+package com.example.falcon_strike_app;
 
 public enum SpriteType {
     PLAYER,
     ENEMY,
     BULLET,
-    EXPLOSION,
-    TITLE
+    EXPLOSION
 }

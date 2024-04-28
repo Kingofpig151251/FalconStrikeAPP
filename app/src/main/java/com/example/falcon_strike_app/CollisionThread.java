@@ -1,4 +1,4 @@
-package com.example.falconstrikeapp;
+package com.example.falcon_strike_app;
 
 import java.util.ArrayList;
 import java.util.List;

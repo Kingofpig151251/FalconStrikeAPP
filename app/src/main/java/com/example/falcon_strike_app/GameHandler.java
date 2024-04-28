@@ -1,4 +1,4 @@
-package com.example.falconstrikeapp;
+package com.example.falcon_strike_app;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -7,33 +7,33 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-// 定義 GameHandler 類別，繼承自 Handler 類別
+// Define GameHandler class, extends from Handler class
 public class GameHandler extends Handler {
     private static final String TAG = "GameRenderHandler";
 
-    private static final int MSG_DO_FRAME = 0;  // 定義處理幀的消息
-    private static final int MSG_SHUTDOWN = 1;  // 定義關閉的消息
+    private static final int MSG_DO_FRAME = 0;  // Define the message for handling frames
+    private static final int MSG_SHUTDOWN = 1;  // Define the message for shutdown
 
-    private final GameThread mGameThread;  // 定義遊戲線程
+    private final GameThread mGameThread;  // Define game thread
 
-    // 定義建構子
+    // Define constructor
     public GameHandler(Looper looper, GameThread gameThread) {
-        super(looper);  // 調用父類的建構子
-        this.mGameThread = gameThread;  // 初始化遊戲線程
+        super(looper);  // Call parent's constructor
+        this.mGameThread = gameThread;  // Initialize game thread
     }
 
-    // 定義發送處理幀的消息的方法
+    // Define method for sending frame handling message
     public void sendDoFrame(long frameTimeNanos) {
         sendMessage(obtainMessage(MSG_DO_FRAME, (int) (frameTimeNanos >> 32),
                 (int) frameTimeNanos));
     }
 
-    // 定義發送關閉的消息的方法
+    // Define method for sending shutdown message
     public void sendShutdown() {
         sendMessage(obtainMessage(MSG_SHUTDOWN));
     }
 
-    // 覆寫處理消息的方法
+    // Override method for handling messages
     @Override
     public void handleMessage(@NonNull Message msg) {
         if (mGameThread == null) {
@@ -45,10 +45,10 @@ public class GameHandler extends Handler {
         switch (what) {
             case MSG_DO_FRAME:
                 long timestamp = (((long) msg.arg1) << 32) | (((long) msg.arg2) & 0xffffffffL);
-                mGameThread.doFrame(timestamp);  // 處理幀
+                mGameThread.doFrame(timestamp);  // Handle frame
                 break;
             case MSG_SHUTDOWN:
-                mGameThread.shutdown();  // 關閉
+                mGameThread.shutdown();  // Shutdown
                 break;
             default:
                 throw new RuntimeException("Unknown message " + what);
