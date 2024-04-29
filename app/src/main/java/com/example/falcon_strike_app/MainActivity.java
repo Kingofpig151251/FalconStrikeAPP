@@ -1,5 +1,6 @@
 package com.example.falcon_strike_app;
 
+import android.content.Intent;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.Choreographer;
@@ -103,5 +104,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             Choreographer.getInstance().postFrameCallback(this);  // Add frame callback to Choreographer
             handler.sendDoFrame(frameTimeNanos);  // Send message to handle frame
         }
+    }
+
+    public void gameOver(int score) {
+        Intent extra = new Intent();
+        extra.putExtra("score", score);
+        setResult(RESULT_OK, extra);
+        finish();
     }
 }

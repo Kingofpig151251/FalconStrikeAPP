@@ -47,15 +47,21 @@ public class PageActivity extends Activity {
         helpButton = findViewById(R.id.helpButton);
         startButton.setOnClickListener(v -> {
             Intent intent = new Intent(PageActivity.this, MainActivity.class);
-            startActivity(intent);
+            startActivityForResult(intent, 1);
         });
         helpButton.setOnClickListener(v -> {
-             //彈出一個對話框,並顯示遊戲說明
-            new AlertDialog.Builder(PageActivity.this)
-                    .setTitle("How to play?")
-                    .setMessage("1. Drag the aircraft to move\n2. Bullets will be automatically fired during dragging\n3. Shoot down the enemy aircraft to gain points\n4. Life will be deducted if touched by the enemy.")
-                    .setPositiveButton("OK", null)
-                    .show();
+            new AlertDialog.Builder(PageActivity.this).setTitle("How to play?").setMessage("1. Drag the aircraft to move\n2. Bullets will be automatically fired during dragging\n3. Shoot down the enemy aircraft to gain points\n4. Life will be deducted if touched by the enemy.").setPositiveButton("OK", null).show();
         });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 1) {
+            if (resultCode == Activity.RESULT_OK) {
+                int score = data.getIntExtra("score", 0);
+                new AlertDialog.Builder(this).setTitle("Your score: ").setMessage(String.valueOf(score)).setPositiveButton("OK", null).show();
+            }
+        }
     }
 }

@@ -135,13 +135,12 @@ public class GamePanel extends SurfaceView implements CollisionListener {
             deltaTime = 0;
             mPlayer.setDragging(false);
             mHandler.removeCallbacks(mActivateEnemyTask);
-            //stop collision thread
             collisionThread.shutDown();
             mHandler.postDelayed(() -> {
-                Intent intent = new Intent(getContext(), PageActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                getContext().startActivity(intent);
-            }, 10);
+                if (getContext() instanceof MainActivity) {
+                    ((MainActivity) getContext()).gameOver(mScore);
+                }
+            }, 1000);
         }
         // Check if the score has reached the threshold for the next level
         if (mScore >= mNextLevelScore) {
