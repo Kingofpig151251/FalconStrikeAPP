@@ -140,7 +140,7 @@ public class GamePanel extends SurfaceView implements CollisionListener {
                 if (getContext() instanceof MainActivity) {
                     ((MainActivity) getContext()).gameOver(mScore);
                 }
-            }, 1000);
+            }, 3000);
         }
         // Check if the score has reached the threshold for the next level
         if (mScore >= mNextLevelScore) {
